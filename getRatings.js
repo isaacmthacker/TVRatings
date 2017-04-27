@@ -74,7 +74,7 @@ function getEpisodeTitle(str) {
 
 function getRating(str) {
 	//console.log(str);
-	return parseFloat(str.match(/\d{1}\.\d{1}/)[0]);
+	return parseFloat(str.match(/\d+\.\d{1}/)[0]);
 }
 
 
