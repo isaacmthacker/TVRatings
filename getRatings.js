@@ -1,4 +1,5 @@
 function getEpisodes() {
+	var seasons = {};
 	var title = document.getElementById("title").value.trim().replace(/\s+/g, "+");
 	var url = "http://www.omdbapi.com/?t=" + title + "&type=series";
 	var id;
@@ -12,7 +13,7 @@ function getEpisodes() {
 			console.log(data);
 			id = data.imdbID;
 			numSeasons = data.totalSeasons;
-			var seasons = {};
+			//var seasons = {};
 			for(var i = 1; i <= numSeasons; ++i) {
 				$.ajax({
 					async : false,
@@ -50,52 +51,95 @@ function getPlot(show, season, episode) {
 
 
 
-function scrapeIMDB(titleID, numSeasons) {
-	var seasons = {};
-	for(var i = 1; i <= numSeasons; ++i) {
-		seasons[i] = [];
-		$.ajax({
-			async : false,
-			url : "getIMDBData.php?id=" + titleID + "&season=" + i,
-			type : "get",
-			success : function(data) {
-				data = data.split("\n");
 
-				var curEpisode = {};
-				var numEpisodes = 0;
-				var inEpisode = false;
-				var foundId = false;
-				for(var j = 0; j < data.length; ++j) {
-					var match = data[j].match(/S\d+, Ep\d+/);
-					if(match) {
-						seasons[i].push(curEpisode);
-						curEpisode = {};
-						foundId = false;
-						inEpisode = true;
-						var str = match[0];
-						str = str.match(/\d+/g);
-						var season = str[0];
-						var episode = str[1];
-						curEpisode["season"] = season;
-						curEpisode["episode"] = episode;
-					} else if(inEpisode && !foundId) {
-						var match = data[j].match(/tt\d{7}/);
-						if(match) {
-							var id = match[0];
-							curEpisode["id"] = id;
-							foundId = true;
-						}
-					}
-				}
-			}
-		});
+function getSeasonAndEpisode(str) {
+	var match = str.match(/\d+\.\d+/g)[0].split(".");
+	return {"season" : parseInt(match[0]), "episode" : parseInt(match[1])};
+}
+
+function getEpisodeTitle(str) {
+	var inBracket = false;
+	var ret = "";
+	for(var i = 0; i < str.length; ++i) {
+		if(str[i] == "<") {
+			inBracket = true;
+		} else if(str[i] == ">") {
+			inBracket = false;
+		} else if(!inBracket) {
+			ret += str[i];
+		}
 	}
-	console.log(seasons);
+	return ret.trim();
+}
+
+function getRating(str) {
+	//console.log(str);
+	return parseFloat(str.match(/\d{1}\.\d{1}/)[0]);
 }
 
 
 
 
+
+
+function getEpisodesAndRatings(title) {
+	var seasons = {};	
+	title = title.trim().replace(/\s+/g, "%20");
+	$.ajax({
+		async : false,
+		type : "get",
+		url : "http://www.omdbapi.com/?t=" + title + "&type=series",
+		success : function(data) {
+			var titleId = data.imdbID;
+			$.ajax({
+				async : false,
+				type : "get",
+				url : "getEpisodes.php?title=" + titleId,
+				success : function(data) {
+					data = data.split("\n");
+					var inTableEntry = false;
+					for(var i = 0; i < data.length; ++i) {
+						if(data[i] == "<tr>") {
+							//console.log(data[i]);
+							inTableEntry = true;
+							i += 1;
+							//console.log(data[i]);
+							var seasonAndEpisode = getSeasonAndEpisode(data[i]);
+							var season = seasonAndEpisode["season"];
+							if(seasons[season] == undefined) {
+								seasons[season] = [];
+							}
+							var episode = {};
+							episode["episode"] = seasonAndEpisode["episode"];
+							i += 1;
+							//console.log(data[i]);
+							episode["title"] = getEpisodeTitle(data[i]);
+							i += 1;
+							//console.log(data[i]);
+							if(data[i] != "</tr>") {
+								episode["rating"] = getRating(data[i]);
+							} else {
+								episode["rating"] = -1;
+							}
+							//console.log(episode);
+							seasons[season].push(episode);
+						} else if(data[i] == "</tr>") {
+							inTableEntry = false;
+						} 
+					}
+				}
+			});
+		}
+	});
+	console.log(seasons);
+	for(x in seasons) {
+		document.body.innerHTML += "<br>" + x + "<br>";
+		for(var i = 0; i < seasons[x].length; ++i) {
+			//console.log(seasons[x]);
+			document.body.innerHTML += seasons[x][i].episode + " " + seasons[x][i].title + " " + seasons[x][i].rating + "<br>";
+		}
+	}
+}
 
 
 
