@@ -132,14 +132,113 @@ function getEpisodesAndRatings(title) {
 		}
 	});
 	console.log(seasons);
+	var numSeasons = 0;
+	var numEpisodes = 0;
 	for(x in seasons) {
+		numSeasons += 1;
+		numEpisodes += seasons[x].length;
+		//seasons["season" + x + "len"] = seasons[x].length;
 		document.body.innerHTML += "<br>" + x + "<br>";
 		for(var i = 0; i < seasons[x].length; ++i) {
 			//console.log(seasons[x]);
 			document.body.innerHTML += seasons[x][i].episode + " " + seasons[x][i].title + " " + seasons[x][i].rating + "<br>";
 		}
 	}
+	seasons["numSeasons"] = numSeasons;
+	seasons["numEpisodes"] = numEpisodes;
+	console.log(seasons);
+	graphRatings(seasons)
 }
+
+
+
+function drawLine(gc, startX, startY, endX, endY) {
+	gc.beginPath();
+	gc.moveTo(startX, startY);
+	gc.lineTo(endX, endY);
+	gc.stroke();
+}
+
+
+
+function graphRatings(seasons) {
+	var canvasWidth = 900;
+	var canvasHeight = 500;
+	document.body.innerHTML += "<canvas id='graph' width=" + canvasWidth + "px height=" + canvasHeight + "px></canvas>";
+	var canvas = document.getElementById("graph");
+	var gc = canvas.getContext("2d");
+	gc.fillRect(0, 0, canvasWidth, canvasHeight);
+	var size = 0.9;
+	var startX = canvasWidth*(1-size);
+	var endX = canvasWidth*size;
+	var startY = canvasHeight*(1-size);
+	var endY = canvasHeight*size;
+	gc.strokeStyle = "lightgrey";
+	gc.lineWidth = 4;
+	//x-axis
+	drawLine(gc, startX, startY, startX, endY);
+	//y-axis
+	drawLine(gc, startX, endY, endX, endY);
+	gc.lineWidth = 1;
+	gc.fillStyle = "lightgrey";
+	var fontSize = 10;
+	gc.fontSize = fontSize;
+	var seasonPositions = [];
+	var numSeasonsSeen = 0;
+	//season ticks
+	//rating tics
+	var offSet = gc.measureText("10").width;
+	gc.lineWidth = 1;
+	for(var i = 1; i <= 10; ++i) {
+		var yPos = (endY-startY)/11 * i + startY;
+		drawLine(gc, startX - offSet, yPos, endX, yPos);
+		gc.fillText(11-i, startX-2*offSet, yPos);
+	}
+	gc.lineWidth = 1;
+	//+1 so it doesn't hit the edge of the chart
+	var offSet = (endX-startX)/(seasons.numEpisodes+1);
+	//Want to start first episode not on the axis
+	var xPos = startX + offSet;
+	console.log(startX, endX);
+	console.log(xPos, offSet);
+	var prevPoint = [];
+
+	for(season in seasons) {
+		console.log(season);
+		for(var i = 0; i < seasons[season].length; ++i) {
+			if(i === 0) {
+				drawLine(gc, xPos, startY, xPos, endY);
+			}
+			console.log(i);
+			var yPos = 100;
+			if(prevPoint != []) {
+				drawLine(gc, prevPoint[0], prevPoint[1], xPos, yPos);
+			}
+			console.log(xPos, endX);
+			prevPoint = [xPos, yPos];
+			//gc.beginPath();
+			//gc.ellipse(xPos, yPos, 1, 1, 0, 0, 2*Math.PI);
+			//gc.stroke();
+			gc.fillText(seasons[season][i].rating, xPos, yPos-10);
+			xPos += offSet;
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
