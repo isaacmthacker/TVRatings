@@ -53,8 +53,13 @@ function getPlot(show, season, episode) {
 
 
 function getSeasonAndEpisode(str) {
-	var match = str.match(/\d+\.\d+/g)[0].split(".");
-	return {"season" : parseInt(match[0]), "episode" : parseInt(match[1])};
+	var match = str.match(/\d+\.\d+/g);
+	if(match) {
+		match = match[0].split(".");
+		return {"season" : parseInt(match[0]), "episode" : parseInt(match[1])};
+	} else {
+		return {"season" : -1, "episode" : -1};
+	}
 }
 
 function getEpisodeTitle(str) {
@@ -84,6 +89,9 @@ function getRating(str) {
 
 function getEpisodesAndRatings(title) {
 	var seasons = {};	
+	var numEpisodes = 0;
+	var sum = 0;
+	var numNoRating = 0;
 	title = title.trim().replace(/\s+/g, "%20");
 	$.ajax({
 		async : false,
@@ -100,10 +108,10 @@ function getEpisodesAndRatings(title) {
 					var inTableEntry = false;
 					for(var i = 0; i < data.length; ++i) {
 						if(data[i] == "<tr>") {
-							//console.log(data[i]);
+							console.log(data[i]);
 							inTableEntry = true;
 							i += 1;
-							//console.log(data[i]);
+							console.log(data[i]);
 							var seasonAndEpisode = getSeasonAndEpisode(data[i]);
 							var season = seasonAndEpisode["season"];
 							if(seasons[season] == undefined) {
@@ -112,17 +120,20 @@ function getEpisodesAndRatings(title) {
 							var episode = {};
 							episode["episode"] = seasonAndEpisode["episode"];
 							i += 1;
-							//console.log(data[i]);
+							console.log(data[i]);
 							episode["title"] = getEpisodeTitle(data[i]);
 							i += 1;
-							//console.log(data[i]);
+							console.log(data[i]);
 							if(data[i] != "</tr>") {
 								episode["rating"] = getRating(data[i]);
+								sum += episode["rating"];
 							} else {
-								episode["rating"] = -1;
+								episode["rating"] = 0;
+								numNoRating += 1;
 							}
 							//console.log(episode);
 							seasons[season].push(episode);
+							numEpisodes += 1;
 						} else if(data[i] == "</tr>") {
 							inTableEntry = false;
 						} 
@@ -132,20 +143,15 @@ function getEpisodesAndRatings(title) {
 		}
 	});
 	console.log(seasons);
-	var numSeasons = 0;
-	var numEpisodes = 0;
 	for(x in seasons) {
-		numSeasons += 1;
-		numEpisodes += seasons[x].length;
-		//seasons["season" + x + "len"] = seasons[x].length;
-		document.body.innerHTML += "<br>" + x + "<br>";
+		//document.body.innerHTML += "<br>" + x + "<br>";
 		for(var i = 0; i < seasons[x].length; ++i) {
-			//console.log(seasons[x]);
-			document.body.innerHTML += seasons[x][i].episode + " " + seasons[x][i].title + " " + seasons[x][i].rating + "<br>";
+			//document.body.innerHTML += seasons[x][i].episode + " " + seasons[x][i].title + " " + seasons[x][i].rating + "<br>";
 		}
 	}
-	seasons["numSeasons"] = numSeasons;
 	seasons["numEpisodes"] = numEpisodes;
+	seasons["average"] = sum/(numEpisodes - numNoRating);
+	console.log(seasons.average);
 	console.log(seasons);
 	graphRatings(seasons)
 }
@@ -162,8 +168,8 @@ function drawLine(gc, startX, startY, endX, endY) {
 
 
 function graphRatings(seasons) {
-	var canvasWidth = 900;
-	var canvasHeight = 500;
+	var canvasWidth = $(window).width()*0.9
+	var canvasHeight = $(window).height()*0.9;
 	document.body.innerHTML += "<canvas id='graph' width=" + canvasWidth + "px height=" + canvasHeight + "px></canvas>";
 	var canvas = document.getElementById("graph");
 	var gc = canvas.getContext("2d");
@@ -183,9 +189,7 @@ function graphRatings(seasons) {
 	gc.fillStyle = "lightgrey";
 	var fontSize = 10;
 	gc.fontSize = fontSize;
-	var seasonPositions = [];
-	var numSeasonsSeen = 0;
-	//season ticks
+
 	//rating tics
 	var offSet = gc.measureText("10").width;
 	gc.lineWidth = 1;
@@ -194,34 +198,48 @@ function graphRatings(seasons) {
 		drawLine(gc, startX - offSet, yPos, endX, yPos);
 		gc.fillText(11-i, startX-2*offSet, yPos);
 	}
+
+
 	gc.lineWidth = 1;
 	//+1 so it doesn't hit the edge of the chart
-	var offSet = (endX-startX)/(seasons.numEpisodes+1);
+	var offSet = (endX-startX)/(seasons.numEpisodes-1);
 	//Want to start first episode not on the axis
-	var xPos = startX + offSet;
+	var xPos = startX;
 	console.log(startX, endX);
 	console.log(xPos, offSet);
 	var prevPoint = [];
 
+	var seasonXs = [];
 	for(season in seasons) {
 		console.log(season);
 		for(var i = 0; i < seasons[season].length; ++i) {
 			if(i === 0) {
 				drawLine(gc, xPos, startY, xPos, endY);
+				//var str = "Season " + season;
+				//gc.fillText(str, xPos - gc.measureText(str).width/2.0, endY + 2*fontSize);
+				seasonXs.push(xPos);
 			}
-			console.log(i);
-			var yPos = 100;
+			//console.log(i);
+			var yPos = endY - ((endY - startY) * seasons[season][i].rating / 11);
+			//console.log(yPos);
 			if(prevPoint != []) {
 				drawLine(gc, prevPoint[0], prevPoint[1], xPos, yPos);
 			}
-			console.log(xPos, endX);
+			//console.log(xPos, endX);
 			prevPoint = [xPos, yPos];
-			//gc.beginPath();
-			//gc.ellipse(xPos, yPos, 1, 1, 0, 0, 2*Math.PI);
-			//gc.stroke();
-			gc.fillText(seasons[season][i].rating, xPos, yPos-10);
+			gc.beginPath();
+			gc.ellipse(xPos, yPos, 1, 1, 0, 0, 2*Math.PI);
+			gc.stroke();
+			//gc.fillText(seasons[season][i].rating, xPos-5, yPos+10);
 			xPos += offSet;
 		}
+	}
+	drawLine(gc, xPos-offSet, startY, xPos-offSet, endY);
+	seasonXs.push(xPos-offSet);
+	for(var i = 1; i < seasonXs.length; ++i) {
+		var str = "Season " + i;
+		var xPos = seasonXs[i-1] + (seasonXs[i] - seasonXs[i-1])/2;
+		gc.fillText(str, xPos - gc.measureText(str).width/2.0, endY + 2*fontSize);
 	}
 }
 
